@@ -11,13 +11,13 @@ library(broom)
 list.files(path = here("NTR4_assignment1/R"), full.names = TRUE) %>% lapply(., source)
 
 # Importing arguments from command line call
-# args = commandArgs(trailingOnly=TRUE) %>% 
-#   parse_args()
+args = commandArgs(trailingOnly=TRUE) %>%
+  parse_args()
 
-args <- list(path = "/home/ntr4/ds_mdm/NTR4_assignment1/data/WTCCC/",
-             ctrl = c("58C", "NBS"),
-             disease = "T2D",
-             chr_n = "22")
+# args <- list(path = "/home/ntr4/ds_mdm/NTR4_assignment1/data/WTCCC/",
+#              ctrl = c("58C", "NBS"),
+#              disease = "T2D",
+#              chr_n = "22")
 
 data <- import_data(args)
 
@@ -28,7 +28,7 @@ annotation <- read_delim(paste0(args$path, args$disease, "/snps_info.tar.gz"),
 
 path = paste0(paste0(args$path, args$disease, "_", args$chr_n, ".csv"))
 
-data_count <- data %>% 
+data %>% 
   #sample_frac(0.01) %>%
   nest(-wtccc_id) %>% 
   mutate(genotype = purrr::map(data, get_genotype),
