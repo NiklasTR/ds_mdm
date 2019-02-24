@@ -16,5 +16,5 @@ test_ctrl_vs_disease <- function(allele){
     magrittr::set_colnames(paste0("cd_", colnames(.))) %>%
     mutate(cd_or = (m[2,2]/m[2,1])/(m[1,2]/m[1,1])) %>% return()
   
-  print("getting ctrl vs. disease")
+  #print("getting ctrl vs. disease")
 }

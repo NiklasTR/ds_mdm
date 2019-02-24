@@ -31,9 +31,9 @@ annotation <- read_delim(paste0(args$path, args$disease, "/snps_info.tar.gz"),
 
 path = paste0(paste0(args$path, args$disease, "_", args$chr_n, ".csv"))
 
-data %>% 
-  #sample_frac(0.01) %>%
+tmp <- data %>% 
   nest(-wtccc_id) %>% 
+  #sample_frac(0.001) %>%
   mutate(genotype = purrr::map(data, get_genotype),
          allele = purrr::map(genotype, get_allele),
          hw = purrr::map2(allele, genotype, test_hardy_weinberg),

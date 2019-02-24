@@ -9,5 +9,5 @@ get_genotype <- function(df){
     mutate(status = if_else(a1 == a2, "homo", "hetero")) %>% 
     return()
   
-  print("getting genotype")
+  #print("getting genotype")
 }

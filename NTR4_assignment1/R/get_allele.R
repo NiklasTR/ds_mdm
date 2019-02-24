@@ -18,5 +18,5 @@ get_allele <- function(genotype){
   
   return(allele)
   
-  print("getting allele")
+  #print("getting allele")
 }

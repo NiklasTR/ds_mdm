@@ -17,5 +17,5 @@ test_hardy_weinberg <- function(allele, genotype){
     magrittr::set_colnames(paste0("hw_", colnames(.))) %>% 
     return()
   
-  print("getting hardy weinberg")
+  #print("getting hardy weinberg")
 }
