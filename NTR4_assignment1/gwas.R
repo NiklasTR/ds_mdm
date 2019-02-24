@@ -14,10 +14,13 @@ list.files(path = here("NTR4_assignment1/R"), full.names = TRUE) %>% lapply(., s
 args = commandArgs(trailingOnly=TRUE) %>%
   parse_args()
 
+# Rscript gwas.R "/home/ntr4/ds_mdm/NTR4_assignment1/data/WTCCC/" "c('58C', 'NBS')" "T2D" "22"
 # args <- list(path = "/home/ntr4/ds_mdm/NTR4_assignment1/data/WTCCC/",
 #              ctrl = c("58C", "NBS"),
 #              disease = "T2D",
 #              chr_n = "22")
+
+print(str(args))
 
 data <- import_data(args)
 
