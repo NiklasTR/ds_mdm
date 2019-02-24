@@ -1,9 +1,9 @@
 get_allele <- function(genotype){
-  allele_hetero <- genotype %>% filter(status == "hetero") %>%
+  allele_hetero <- genotype %>% dplyr::filter(status == "hetero") %>%
     dplyr::select(-a1, -a2, -genotype, -status, n_hetero = n)
   
   allele <- genotype %>% 
-    filter(status == "homo") %>% 
+    dplyr::filter(status == "homo") %>% 
     mutate(n_a = ifelse(status == "homo", n*2, n)) %>%
     left_join(., allele_hetero, by = c("group")) %>% 
     mutate(n = n_a + n_hetero) %>% 
