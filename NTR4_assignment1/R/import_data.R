@@ -13,14 +13,14 @@ import_data <- function(args){
   # reading files
   lapply(path_ctrl, read_delim, delim="\t", col_names=F) %>% 
     bind_rows() %>% 
+    magrittr::set_colnames(c("chr_n", "wtccc_id", "start", "end", colnames(.)[-c(1:4)])) %>%
+    gather(subject, genotype, -chr_n, -wtccc_id, -start, -end)%>%
     mutate(group = "ctrl") %>%
-    magrittr::set_colnames(c("chr_n", "wtccc_id", "start", "end"), colnames(.)[-c(1:4)]) %>%
-    gather(subject, genotype, -chr_n, -wtccc_id, -start, -end)
-    
-    
-    
-    
-    rbind(., 
+    rbind(.,
           lapply(path_disease, read_delim, delim="\t", col_names=F) %>% 
             bind_rows() %>% 
-            mutate(group = "disease"))
+            magrittr::set_colnames(c("chr_n", "wtccc_id", "start", "end", colnames(.)[-c(1:4)])) %>%
+            gather(subject, genotype, -chr_n, -wtccc_id, -start, -end)%>%
+            mutate(group = "disease")) %>% 
+    return()
+}
