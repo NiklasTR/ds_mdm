@@ -5,6 +5,7 @@ library(readr)
 library(here)
 library(tidyr)
 library(naniar)
+library(broom)
 
 # Sourcing scripts - in a perfect world I would make this a package
 list.files(path = here("NTR4_assignment1/R"), full.names = TRUE) %>% lapply(., source)
@@ -20,6 +21,13 @@ args <- list(path = "/home/ntr4/ds_mdm/NTR4_assignment1/data/WTCCC/",
 
 data <- import_data(args)
 
+annotation <- read_delim(paste0(args$path, args$disease, "/snps_info.tar.gz"), 
+                         "\t", escape_double = FALSE, col_names = FALSE, 
+                         trim_ws = TRUE)[,c(3:5)] %>% 
+  magrittr::set_colnames(c("egav_id", "wtccc_id", "rs_id"))
+
+path = paste0(paste0(args$path, args$disease, "_", args$chr_n, ".csv"))
+
 data_count <- data %>% 
   #sample_frac(0.01) %>%
   nest(-wtccc_id) %>% 
@@ -30,14 +38,9 @@ data_count <- data %>%
          format = purrr::map(allele, add_description)
          ) %>% 
   unnest(hw, cd, format) %>% 
-  mutate(chr_n = args$chr_n)
+  mutate(chr_n = args$chr_n) %>%
+  dplyr::select(-genotype, -allele, -data) %>%
+  left_join(annotation) %>% 
+  write.csv(path, row.names=FALSE)
 
-
-
-  
-
-
-
-  
-
-#NP id (rsid), chromosome number, minor allele, major allele, minor allele frequency in disease, minor allele frequency in controls, odds ratio (major vs. minor allele), p-value, Hardy-Weinberg deviation p-value
+print(paste0("wrote ", path))

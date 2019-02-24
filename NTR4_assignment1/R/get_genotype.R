@@ -8,4 +8,6 @@ get_genotype <- function(df){
     separate(genotype, c("a1", "a2"), sep = " ", remove = FALSE) %>% 
     mutate(status = if_else(a1 == a2, "homo", "hetero")) %>% 
     return()
+  
+  print("getting genotype")
 }

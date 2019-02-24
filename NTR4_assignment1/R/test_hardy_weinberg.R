@@ -16,4 +16,6 @@ test_hardy_weinberg <- function(allele, genotype){
     dplyr::select(p.value) %>%
     magrittr::set_colnames(paste0("hw_", colnames(.))) %>% 
     return()
+  
+  print("getting hardy weinberg")
 }

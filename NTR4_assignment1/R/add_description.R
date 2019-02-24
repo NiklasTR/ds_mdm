@@ -18,4 +18,6 @@ add_description <- function(allele){
             spread(type, ratio)
     ) %>% 
     return()
+  
+  print("getting description")
 }

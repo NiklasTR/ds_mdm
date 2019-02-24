@@ -17,4 +17,6 @@ get_allele <- function(genotype){
     mutate(type = if_else(sum_allele == max(sum_allele), "major", "minor"))
   
   return(allele)
+  
+  print("getting allele")
 }

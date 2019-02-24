@@ -15,4 +15,6 @@ test_ctrl_vs_disease <- function(allele){
     dplyr::select(p.value) %>%
     magrittr::set_colnames(paste0("cd_", colnames(.))) %>%
     mutate(cd_or = (m[2,2]/m[2,1])/(m[1,2]/m[1,1])) %>% return()
+  
+  print("getting ctrl vs. disease")
 }
