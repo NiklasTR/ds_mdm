@@ -1,0 +1,196 @@
+---
+title: "Assignment 1"
+author: "Niklas Rindtorff"
+date: "2/3/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Background questions:
+
+## 1.) What are the diseases of interest ascertained in the WTCCC study? Draw the E, G, P, and D diagram and annotate what is investigated in the WTCCC GWASs.(2 points)
+
+Next to two control groups, the study included seven groups with the following diseases: 
+* BD - bipolar disorder
+* CAD - coronary artery disease
+* CD - crohn's disease
+* HT - primary hypertension
+* RA - rheumatoid arthritis
+* T1D - type 1 diabetes mellitus
+* T2D - type 2 diabetes mellitus\
+
+The study investigated the relationships between variations in the genome and diseases. Diseases themselves are a subgroup of a person's phenome. The **X** (genome-wide SNPs) are highlighted in green, the **y** (cohort) is shown in blue.
+
+![P=E+G theorem in this study](~/GitHub/ds_mdm/NTR4_assignment1/figures/peg.png)
+
+## 2.) How are the each of the seven diseases assayed phenotypically (7 points)?
+
+TODO
+
+The sampples for this study were accrued from different, already existing, cohorts that represented the UK population with European ancestry. The patients were clinically diagnosed with a given condition but not further phenotypically profiled.
+
+Further details can be found in the citation below from the WTCCC paper: 
+
+*Case series came from previously established collections with nationally represent- ative recruitment: 2,000 samples were genotyped for each. The control samples came from two sources: half from the 1958 Birth Cohort and the remainder from a newUK Blood Service sample. The latter collection was established specifically for this study and is a UK national repository ofanonymized DNA samples from 3,622 consenting blood donors. The vast majority ofsubjects were self-reported as of European Caucasian ancestry.*
+
+## 3.) What is the assay platform for this study? Briefly describe the concept behind the assay technology (2points).
+
+The authors use the Affymetrix GeneChip 500K Mapping Array Set to genotype patients. Briefly, this chip contains ~500,000 oligonucleotide DNA probes that hybridize with a patients flourescently labeled DNA according to Watson-Crick base pairing. If a given individual has a certain SNP that is represented on the chip, its DNA will bind a probe for this polymorphism while the wildtype probe will not bind labeled DNA (assuming homozygosity of the SNP). After hybridization, the individual's genotype can be measured and reconstructed using flourescent microscopy.
+
+## 4.) How many SNPs are measured for each individual for all the chromosomes (you can do a line count of the data files themselves) (1 point)?
+
+I log into orechstra, start a tmux session and execute the following code in the command line: 
+
+```{r, eval = FALSE}
+wc -l ~/ > ~/ds_mdm/NTR4_assignment1/data/row_count.txt
+```
+
+Now I load the data into R and create a plot. 
+
+```{r}
+# Initiating R session 
+library(tidyverse)
+
+#read.delim()
+```
+
+
+## 5.) Let’s start small. The year is 1999, and an investigator has painstakingly genotyped 1 SNP called (rsGOINGALLIN) in individuals with bipolar disorder and without. 
+
+He asks you how to execute an allele-based test of association “allele frequency test”, whereby the
+reference allele is the major allele (the allele, C or T, that is most prevalent in the healthy population).
+
+### A.) What is the allele frequency (C and T) in bipolar population? And in Controls? (4 points)
+
+We can calculate the allele frequency by solving the genotypes according to the Hardy-Weinberg theorem. I validate this approach by: 
+
+* summing the allele frequencies 
+* calculating the heterozygous genotype abundance
+
+```{r}
+bipolar <- c(270, 957, 771)
+ctrl <- c(436, 1398, 1170)
+# scaling the genotypes by total count
+bipolar_scaled <- bipolar/sum(bipolar)
+ctrl_scaled <- ctrl/sum(ctrl)
+# calculating the sqrt of the first and last genotype. The heterozygous genotype should have the abundance of 2ab according to Hardy-Weinberg
+allele_freq_bipolar <- sqrt(bipolar_scaled[c(1,3)])
+allele_freq_ctrl <- sqrt(ctrl_scaled[c(1,3)])
+
+# I perform a quick test for the bipolar subgroup: 
+# The sum of frequencies should be almost 1
+sum(allele_freq_bipolar) %>% round(2)
+# The heterozygous allele frequency should close to our observed. The difference is very small
+((2*allele_freq_bipolar[1]*allele_freq_bipolar[2])-bipolar_scaled[2]) %>% round(2)
+
+# I plot the final table 
+allele_freq <- tibble(allele = rep(c("C", "T"), times = 2),
+       freq = c(allele_freq_bipolar %>% round(2), allele_freq_ctrl %>% round(2)),
+       condition = c("bipolar", "bipolar", "ctrl", "ctrl"))
+
+allele_freq
+```
+
+
+### B.) Execute a chi-squared test to test the association of the allele frequency in bipolar vs. controls in R and report the pvalue. 
+
+Is there evidence to conclude there is an association between rsGOINGALLIN
+and bipolar disorder? (4 points)
+
+I create a matrix from the allele frequency counts. The *C* allele is our allele of interest. I create a 2x2 table of subjects that carry the allele and subjects that do not carry the allele. 
+
+```{r}
+matrix(c(270 + 957, 771, 436 + 1398, 1170), byrow = TRUE, ncol = 2) %>% 
+  chisq.test()
+```
+
+We can not reject the null, that there is no link between the abundance of *C* in rsGOINGALLIN and bipolar disorder. The p-value for the Chi-squared test is *0.82*.
+
+### C.) Execute a chi-squared test amongst healthy controls to test for deviation from Hardy-Weinberg equilibrium (4 points).
+
+Now we take the allele frequencies estimated from diseased individuals, and calculate the predicted number of genotypes for the control group. After that, we calculate the Chi-Square test to test for a deviation from the HWE. 
+
+```{r}
+# I calculate the expected distribution of genotypes
+ctrl_expected <- c(allele_freq_bipolar[1]^2,
+                   2*allele_freq_bipolar[1]*allele_freq_bipolar[2],
+                   allele_freq_bipolar[2]^2)*sum(ctrl)
+# I create a matrix of observed vs. expected and test it
+matrix(c(ctrl_expected, ctrl), byrow = TRUE, ncol = 3) %>% chisq.test()
+
+```
+
+We can not reject the null hypothesis which assumes a Hardy-Weinberg equalibrium. The p-value is 0.7354. 
+
+# Execution of GWAS:
+## 1.) We are now going to execute a GWAS on T2D, a moderately heritable disease in which both the genome and exposome are said to play a role. 
+
+### A.) After filtration, how many SNPs are available for analysis? Why filter out SNPs that deviate from Hardy-Weinberg? What is the Bonferroni-threshold of significance (round to 1 significant figure) (2points).
+
+### B.) Compile the GWAS results into one .csv table and call it ‘T2D.csv’ (15 points=10 points for correct findings and format+5 points for correct filtration]).
+
+## 2.) Analysis of GWAS results:
+### A.) Produce a manhattan plot and qqplot of the pvalues (2 points).
+### B.) How many SNPs were found that exceeded the Bonferroni-level of significance for T2D? (1point)
+### C.) What could be biasing the associations and how might one control for this phenomenon? (1point)
+
+### D.) What is the p-value of association and odds ratio for rs4506565 for T2D? What is the interpretation of the odds ratio? What gene is this SNP associated with and its putative function in T2D pathogenesis? (10 points)
+
+## 3.) You just executed an allele frequency test of association. How would the genotypic test of association be different? Second, how would you test both of these types of allele configurations using a logistic regression? (2 points).
+
+## 4.) What is the main analytical differences between the test in Background Question 4 (candidate SNP) and GWAS? Why would one want to execute one or the other (1 point)?
+
+## 5.) In question 2B.), you identified sources of biases for GWASs. One source of bias can be controlled for using information from the SNP array. What is this factor? (2 points).
+
+## 6.) The genomic inflation factor is arithmetically defined as the median of the observed chi-squared values (a function of the pvalues in GWAS) divided by the median of the expected chi-squared values.
+
+1).
+Estimate the genomic inflation factor for your GWAS in T2D. What does this quantity estimate? (10
+points [5 points for estimate, 5 points for answer]).
+7.) BONUS. Modify your code to take into account this bias and re-run your associations for ‘Executing
+GWAS’, Question 1 (10 point bonus).
+GWAS and Medical Decision Making: Introduction to the Polygenic Risk Score (25 points)
+1.) What is a “polygenic risk score”? What is the underlying assumption? (1 point)
+2.) Suppose you have a set of M SNPs associated with a disease/phenotype (say identified at p-value
+threshold of P), each with an effect size x_i (i indexes the ith SNP of M total SNPs). Specifically, x_i is
+the odds ratio of the risk allele relative to the non-risk allele for M independent SNPs that are not in LD
+with one another. You also have SNP data for one individual with the number of risk alleles n_i that
+correspond to the effect sizes x_i assuming the effects are additive. Write down the formula to
+compute the PRS for this individual. (2 points)
+3.) Using your GWAS summary statistics for T2D, compute the PRS for each individual in the cases and
+controls for T2D. Plot a histogram of the distribution of the PRS in cases and controls (in different
+colors) and indicate the quintiles (20, 40, 60, 80, 100 percentiles of the distribution). (5 points)
+- BE careful! Make sure all of your ORs are for the risk allele (reference allele is the non-risk
+allele)!
+- There is an emerging literature on what SNPs to choose for a PRS. For this exercise, use a
+pvalue threshold of 1e-7, HWE pvalue > 0.05 and minor allele frequency of greater than 1% (in
+both cases and controls)
+4.) Suppose you have an individual in the 85th percentile of the PRS distribution for T2D and you are the
+individual’s physician--what do you advise your patient? Suppose another individual is in the 43rd
+percentile--what do you advise this patient? (5 points)
+4
+5.) T2D is a risk factor for cardiovascular disease (see:
+https://www.niddk.nih.gov/health-information/diabetes/overview/preventing-problems/heart-disease-s
+troke). Using your GWAS summary statistics for T2D, compute the PRS for each individual for the CVD
+cases . Add this to the histogram. Are individuals with the highest T2D PRS at genetic risk for CVD? (5
+points)
+6.) Suppose you are given SNP data for a set of new patients with and without T2D. How would you expect
+your PRS to perform on the new patients (ie, more discriminative, less discriminative, or the same)?
+Why or why not? Further, you did not account for LD when estimating the PRS. How does not
+accounting for LD influence the PRS? (4 points)
+7.) Encapsulate your work above into an R function that accepts a two column data frame of SNPs and
+genotypes for a single individual as input and returns a polygenic risk score for that individual. (3
+points)
+Genetic architecture and disease similarity (25 point bonus):
+Execute question 2 for all 7 diseases and answer the following questions.
+1.) Produce a qqplot for each disease using ggplot. Rank each disease by the number of significant
+findings (pvalue threshold of 1x10
+-7
+) (10 point bonus).
+2.) What disease, if any, diseases are associated with the the SNP rs6679677 (2 point bonus)?
+3.) What are the potential biological meaning of a SNPs found in multiple diseases (3 point bonus)?
+4.) Devise a method to correlate diseases on the basis of their association statistics (e.g., pvalues
+and/or odds ratios). What diseases are most correlated with each other? (10 point bonus).
