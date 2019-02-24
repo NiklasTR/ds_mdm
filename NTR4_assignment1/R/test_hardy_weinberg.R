@@ -1,4 +1,7 @@
 test_hardy_weinberg <- function(allele, genotype){
+  
+  if(n_miss(allele) > 0 | nrow(allele) != 4){return(tibble(hw_p.value = NA))}
+  
   allele <- allele %>% filter(group == "ctrl")
   genotype <- genotype %>% filter(group == "ctrl")
   

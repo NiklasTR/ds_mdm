@@ -5,9 +5,9 @@ get_allele <- function(genotype){
   allele <- genotype %>% 
     filter(status == "homo") %>% 
     mutate(n_a = ifelse(status == "homo", n*2, n)) %>%
-    left_join(., allele_hetero, by = c("wtccc_id", "group")) %>% 
+    left_join(., allele_hetero, by = c("group")) %>% 
     mutate(n = n_a + n_hetero) %>% 
-    dplyr::select(wtccc_id, group, a1, n) %>% 
+    dplyr::select(group, a1, n) %>% 
     group_by(group) %>%
     mutate(sum = sum(n),
            ratio = n/sum) %>%

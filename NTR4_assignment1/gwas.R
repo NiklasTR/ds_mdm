@@ -4,6 +4,7 @@ library(magrittr)
 library(readr)
 library(here)
 library(tidyr)
+library(naniar)
 
 # Sourcing scripts - in a perfect world I would make this a package
 list.files(path = here("NTR4_assignment1/R"), full.names = TRUE) %>% lapply(., source)
@@ -22,12 +23,14 @@ data <- import_data(args)
 data_count <- data %>% 
   #sample_frac(0.01) %>%
   nest(-wtccc_id) %>% 
-  mutate(genotype = purrr::map(data, ~ get_genotype),
-         allele = purrr::map(genotype, ~ get_allele),
-         hw = purrr::map2(allele, genotype, ~ test_hardy_weinberg),
-         cd = purrr::map(test_ctrl_vs_disease, ~ allele),
-         format = purrr::map(add_description, ~ allele)
-         )
+  mutate(genotype = purrr::map(data, get_genotype),
+         allele = purrr::map(genotype, get_allele),
+         hw = purrr::map2(allele, genotype, test_hardy_weinberg),
+         cd = purrr::map(allele, test_ctrl_vs_disease),
+         format = purrr::map(allele, add_description)
+         ) %>% 
+  unnest(hw, cd, format) %>% 
+  mutate(chr_n = args$chr_n)
 
 
 

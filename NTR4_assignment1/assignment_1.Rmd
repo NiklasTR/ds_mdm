@@ -134,6 +134,7 @@ After logging in, I start a tmux session, import R and organize my packages.
 ```{r, eval = FALSE}
 srun --pty -p interactive -t 0-12:00 --mem 8G -c 1 bash
 tmux new -s assignment1
+
 module load gcc/6.2.0
 module load spider R/3.5.1
 ```
