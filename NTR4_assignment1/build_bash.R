@@ -10,10 +10,10 @@ chr <- c("01", "02", "03", "04", "05", "06", "07", "08", "09",
          "21", "22", "X")
 
 
-line[15] %>% 
+line[length(line)] %>% 
   str_replace(pattern = "T2D", replacement = disease) %>% 
   lapply(., str_replace, pattern = "22", replacement = chr) %>% 
   unlist() %>%
-  lapply(., function(x) c(line[1:14], x)) %>% 
-  lapply(., function(x) write_lines(path = paste0(here("NTR4_assignment1/bash/"), "call_", x[15] %>% str_split(pattern = "'") %>% unlist() %>% .[c(6, 8)] %>% paste(collapse = "_"), ".run"), x))
+  lapply(., function(x) c(line[1:length(line)-1], x)) %>% 
+  lapply(., function(x) write_lines(path = paste0(here("NTR4_assignment1/bash/"), "call_", x[length(line)] %>% str_split(pattern = "'") %>% unlist() %>% .[c(6, 8)] %>% paste(collapse = "_"), ".run"), x))
 
