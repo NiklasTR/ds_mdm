@@ -2,8 +2,6 @@
 
 #SBATCH -p short
 #SBATCH --mem=8G
-#SBATCH –o %j.out
-#SBATCH –e %j.err
 #SBATCH --mail-type=ALL
 #SBATCH –-mail-user=ntr4@med.harvard.edu
 
