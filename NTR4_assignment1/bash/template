@@ -1,7 +1,6 @@
-#! /bin/sh
+#!/bin/sh
 
 #SBATCH -p short
-#SBATCH –n 2
 #SBATCH --mem=8G
 #SBATCH –o %j.out
 #SBATCH –e %j.err
