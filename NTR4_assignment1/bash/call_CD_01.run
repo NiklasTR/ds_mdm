@@ -1,4 +1,4 @@
- #!/bin/sh
+#!/bin/sh
 
 #SBATCH -p short
 #SBATCH --mem=8G
