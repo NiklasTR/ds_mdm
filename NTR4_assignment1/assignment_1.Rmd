@@ -147,6 +147,12 @@ echo 'R_LIBS_USER="~/R-3.5.1/library"' >  $HOME/.Renviron
 export R_LIBS_USER="~/R-3.5.1/library"
 ```
 
+I submit jobs by running the small loop in the */bash* directory 
+
+```{r, eval = FALSE}
+for FILE in call_T1D_*; do echo ${FILE}; sbatch ${FILE}; sleep 1; done
+```
+
 
 ## 1.) We are now going to execute a GWAS on T2D, a moderately heritable disease in which both the genome and exposome are said to play a role. 
 
