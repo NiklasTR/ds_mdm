@@ -11,8 +11,11 @@ import_data <- function(args){
                        sep = "/")
   
   # reading files
-  lapply(path_ctrl, read_delim, delim="\t", col_names=F) %>% 
-    bind_rows() %>% 
+   lapply(path_ctrl[1], function(x) read_delim(x, delim="\t", col_names=F) %>% .[,c(1:4)]) %>% 
+     # clunky way of generating SNP descriptors
+    append(lapply(path_ctrl, function(x) read_delim(x, delim="\t", col_names=F) %>% .[,-c(1:4)])) %>%
+     # only binding the measurment data. I had a big in this code, that was row_binding and not column_binding the information
+    bind_cols() %>% 
     magrittr::set_colnames(c("chr_n", "wtccc_id", "start", "end", colnames(.)[-c(1:4)])) %>%
     gather(subject, genotype, -chr_n, -wtccc_id, -start, -end)%>%
     mutate(group = "ctrl") %>%
