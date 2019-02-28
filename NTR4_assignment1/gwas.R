@@ -24,10 +24,10 @@ print(str(args))
 
 data <- import_data(args)
 
-# annotation <- read_delim(paste0(args$path, args$disease, "/snps_info.tar.gz"),
-#                          "\t", escape_double = FALSE, col_names = FALSE,
-#                          trim_ws = TRUE)[,c(3:5)] %>%
-#   magrittr::set_colnames(c("egav_id", "wtccc_id", "rs_id"))
+annotation <- read_delim(paste0(args$path, args$disease, "/snps_info.tar.gz"),
+                         "\t", escape_double = FALSE, col_names = FALSE,
+                         trim_ws = TRUE)[,c(3:5)] %>%
+  magrittr::set_colnames(c("egav_id", "wtccc_id", "rs_id"))
 
 path = paste0(paste0(args$path, args$disease, "_", args$chr_n, ".csv"))
 
@@ -43,7 +43,7 @@ tmp <- data %>%
   unnest(hw, cd, format) %>% 
   mutate(chr_n = args$chr_n) %>%
   dplyr::select(-genotype, -allele, -data) %>%
-  # left_join(annotation) %>% 
+   left_join(annotation) %>% 
   write.csv(path, row.names=FALSE)
 
 print(paste0("wrote ", path))
