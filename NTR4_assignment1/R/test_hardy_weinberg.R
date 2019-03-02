@@ -8,7 +8,7 @@ test_hardy_weinberg <- function(allele, genotype){
   n_pred <- tibble(predicted = c(allele$ratio[1]^2,
                                  2*allele$ratio[1]*allele$ratio[2],
                                  allele$ratio[2]^2) * unique(genotype$sum)) %>% 
-    cbind(genotype,.)
+    cbind(genotype %>% ungroup(),.)
   
   matrix(c(n_pred$n, n_pred$predicted), nrow = 2, byrow = TRUE) %>%
     chisq.test() %>%
