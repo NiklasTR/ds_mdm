@@ -18,7 +18,7 @@ args = commandArgs(trailingOnly=TRUE) %>%
 # args <- list(path = "/home/ntr4/ds_mdm/NTR4_assignment1/data/WTCCC/",
 #              ctrl = c("58C", "NBS"),
 #              disease = "T2D",
-#              chr_n = "22")
+#              chr_n = "X")
 
 print(str(args))
 

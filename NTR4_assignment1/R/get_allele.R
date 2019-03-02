@@ -14,7 +14,12 @@ get_allele <- function(genotype){
     group_by(a1) %>% 
     mutate(sum_allele = sum(n)) %>% 
     ungroup() %>%
+    # in cases in which the allele frequency is equal, I need to break the tie
     mutate(type = if_else(sum_allele == max(sum_allele), "major", "minor"))
+  
+  if(allele$type %>% unique() %>% length() < 2){
+    allele$type <- rep(c("major", "minor"), times = 2)
+  }
   
   return(allele)
   
