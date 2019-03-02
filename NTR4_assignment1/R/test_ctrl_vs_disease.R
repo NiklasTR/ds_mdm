@@ -3,7 +3,7 @@ test_ctrl_vs_disease <- function(allele){
   if(n_miss(allele) > 0 | nrow(allele) != 4){return(tibble(cd_p.value = NA,
                                                            cd_or = NA))}
   
-  allele <- allele %>% arrange(group, type)
+  allele <- allele %>% ungroup() %>% arrange(group, type)
   m <- matrix(c(allele$n), nrow = 2, byrow = TRUE)
   
   #if(is.na(m)){return(NA)}
