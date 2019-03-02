@@ -1,6 +1,7 @@
 library(here)
 library(dplyr)
 library(stringr)
+library(tidyverse)
 
 line <- read_lines(here("NTR4_assignment1/bash/template"))
 
