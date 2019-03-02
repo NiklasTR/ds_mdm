@@ -17,6 +17,7 @@ get_genotype <- function(df){
   
   # adding a clunky function to avoid rare events, in which both ctrl and disease group do not have all 3 expected genotype configurations
   
+  ## case 1 - no heterozygous configuration
   if(df_com$status %>% unique() %>% length() < 2 & df_com$status %>% unique() %>% .[1]== "homo"){
     df_com <- df_com %>% group_by(group) %>% 
       do(rbind(., tibble(status = "hetero", 
@@ -25,19 +26,21 @@ get_genotype <- function(df){
                          a2 = .$a2[2], 
                          genotype = paste0(a1, " ", a2), 
                          n = NA, 
-                         sum = NA, 
+                         sum = .$sum[1], 
                          group = .$group %>% unique()))) %>% 
       replace_na(list(n = 0, sum = 0)) 
   }
   
-  if(df_com$status %>% unique() %>% length() < 2 & df_com$status %>% unique() %>% .[1] == "hetero"){
-    df_com <- df_com %>% group_by(group) %>% 
+  ## case 2 - no homozygous configuration for one allele
+  if(df_com$status %>% length() < 6 & ("hetero" %in% (df_com$status %>% unique()))){
+    df_com <- df_com %>% arrange(status) %>% 
+      group_by(group) %>% 
       do(rbind(., tibble(status = "homo", 
-                         a1 = .$a1[1], 
-                         a2 = .$a2[2], 
+                         a1 = "N", 
+                         a2 = "N", 
                          genotype = paste0(a1, " ", a2), 
                          n = NA, 
-                         sum = NA, 
+                         sum = .$sum[1], 
                          group = .$group %>% unique()))) %>% 
       replace_na(list(n = 0, sum = 0)) 
   }
