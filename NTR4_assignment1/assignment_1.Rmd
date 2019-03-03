@@ -346,9 +346,11 @@ t2d_fc_r <- t2d_fc %>%
   filter(cd_p.value < 1e-7)
 ```
 
-With this list of SNPs, I load a set of chromosomes and left_join the locations that are relevant for my condition of interest.
+With this list of SNPs, I load a set of chromosomes and left_join the locations that are relevant for my condition of interest. I run this operation on the cluster, as it consumes a lot of compute. 
 
-```{r}
+Below is an excerpt of the pgr.R script that I subnmit using sbatch.
+
+```{r, eval = FALSE}
 library(parallel)
 list.files(path = here("NTR4_assignment1/R"), full.names = TRUE) %>% lapply(., source)
 
@@ -363,11 +365,11 @@ chr <- c("01", "02", "03", "04", "05", "06", "07", "08", "09", "10",
 
 args_list <- lapply(chr[length(chr)], function(x){args$chr_n <- x; return(args)})
 
-args_list %>% 
+tmp <- args_list %>% 
   mclapply(., function(x) import_data(x) %>% 
            mutate(chr_n = as.character(chr_n)) %>% 
            filter(wtccc_id %in% t2d_fc_r$wtccc_id)) %>%
-  bind_rows() %>% 
+  bind_rows()
   
 
 ```
