@@ -150,7 +150,7 @@ export R_LIBS_USER="~/R-3.5.1/library"
 I submit jobs by running the small loop in the */bash* directory 
 
 ```{r, eval = FALSE}
-for FILE in call_T2D_*; do echo ${FILE}; sbatch ${FILE}; sleep 1; done
+for FILE in call_pgrT2D_*; do echo ${FILE}; sbatch ${FILE}; sleep 1; done
 ```
 
 
@@ -344,6 +344,9 @@ t2d_fc_r <- t2d_fc %>%
   filter(hw_p.value > 0.05) %>% 
   filter(!(minor_disease < 0.01 | minor_ctrl < 0.01)) %>% 
   filter(cd_p.value < 1e-7)
+
+# I store the file for use on o2
+t2d_fc_r %>% write_csv(here("NTR4_assignment1/data/T2D_pgr.csv"))
 ```
 
 With this list of SNPs, I load a set of chromosomes and left_join the locations that are relevant for my condition of interest. I run this operation on the cluster, as it consumes a lot of compute. 
