@@ -150,7 +150,7 @@ export R_LIBS_USER="~/R-3.5.1/library"
 I submit jobs by running the small loop in the */bash* directory 
 
 ```{r, eval = FALSE}
-for FILE in call_T1D_*; do echo ${FILE}; sbatch ${FILE}; sleep 1; done
+for FILE in call_T2D_*; do echo ${FILE}; sbatch ${FILE}; sleep 1; done
 ```
 
 
@@ -162,35 +162,70 @@ for FILE in call_T1D_*; do echo ${FILE}; sbatch ${FILE}; sleep 1; done
 
 ## 2.) Analysis of GWAS results:
 ### A.) Produce a manhattan plot and qqplot of the pvalues (2 points).
+
+```{r}
+t2d %>% 
+  mutate(log_p = -log10(cd_p.value))
+  ggplot(aes(x = ,
+             y = ))
+
+t2d %>% 
+  ggplot(aes(sample = y)) + 
+  stat_qq() + 
+  stat_qq_line() + 
+  theme_classic() + 
+  labs(title = "QQ Plot")
+```
+
+
 ### B.) How many SNPs were found that exceeded the Bonferroni-level of significance for T2D? (1point)
 ### C.) What could be biasing the associations and how might one control for this phenomenon? (1point)
 
 ### D.) What is the p-value of association and odds ratio for rs4506565 for T2D? What is the interpretation of the odds ratio? What gene is this SNP associated with and its putative function in T2D pathogenesis? (10 points)
 
+```{r}
+t2d %>% 
+  filter( == "rs4506565") %>% 
+  
+```
+
+
 ## 3.) You just executed an allele frequency test of association. How would the genotypic test of association be different? Second, how would you test both of these types of allele configurations using a logistic regression? (2 points).
+
+A genotype test for association, would be based on a 3x2 matrix of genotype abundance in the control and diseased subgroup. Similar to the allele-based test (with a 2x2 matrix), we could perform a Chi-Square test of association.
+
+In case of a logistic regression, we would dumbify 2 of the 3 genotype configurations, while excluding the most frequent genotype configuration. The presence or absence of a given genotype would be a binary feature in the logistic regression model. In contrast, for an allele-frequency based test, we assume a linear "allele-dose" relationship in which a coefficient is multiplied by the number of alleles counted in a given individual. 
 
 ## 4.) What is the main analytical differences between the test in Background Question 4 (candidate SNP) and GWAS? Why would one want to execute one or the other (1 point)?
 
+The main analytical difference is the scale of evaluation. In a GWAS we perform thousands of tests, while a candidate evalutation only relies on one statistical test. Thus, we need to take great care to control our type-1 error in GWAS studies by multiple-test correction, which reduces our power. This does not apply for the evaluation of a single candidate. Thus, if we have a strong hypothesis and only a limited number of samples, performing a candidate evaluation instead of a GWAS is the most successful strategy.
+
 ## 5.) In question 2B.), you identified sources of biases for GWASs. One source of bias can be controlled for using information from the SNP array. What is this factor? (2 points).
+
+
 
 ## 6.) The genomic inflation factor is arithmetically defined as the median of the observed chi-squared values (a function of the pvalues in GWAS) divided by the median of the expected chi-squared values.
 
-1).
-Estimate the genomic inflation factor for your GWAS in T2D. What does this quantity estimate? (10
-points [5 points for estimate, 5 points for answer]).
-7.) BONUS. Modify your code to take into account this bias and re-run your associations for ‘Executing
-GWAS’, Question 1 (10 point bonus).
-GWAS and Medical Decision Making: Introduction to the Polygenic Risk Score (25 points)
-1.) What is a “polygenic risk score”? What is the underlying assumption? (1 point)
-2.) Suppose you have a set of M SNPs associated with a disease/phenotype (say identified at p-value
-threshold of P), each with an effect size x_i (i indexes the ith SNP of M total SNPs). Specifically, x_i is
-the odds ratio of the risk allele relative to the non-risk allele for M independent SNPs that are not in LD
-with one another. You also have SNP data for one individual with the number of risk alleles n_i that
-correspond to the effect sizes x_i assuming the effects are additive. Write down the formula to
-compute the PRS for this individual. (2 points)
-3.) Using your GWAS summary statistics for T2D, compute the PRS for each individual in the cases and
-controls for T2D. Plot a histogram of the distribution of the PRS in cases and controls (in different
-colors) and indicate the quintiles (20, 40, 60, 80, 100 percentiles of the distribution). (5 points)
+## 1). Estimate the genomic inflation factor for your GWAS in T2D. What does this quantity estimate? (10 points [5 points for estimate, 5 points for answer]).
+
+## 7.) BONUS. Modify your code to take into account this bias and re-run your associations for ‘Executing GWAS’, Question 1 (10 point bonus).
+
+# GWAS and Medical Decision Making: Introduction to the Polygenic Risk Score (25 points)
+
+## 1.) What is a “polygenic risk score”? What is the underlying assumption? (1 point)
+
+A polygenic risk score describes the odds of developing a given complex disease based on an individual's genotype. In practice, a polygenic risk score is often calculated by fitting a logistic regression model based on pre-selected SNP mutation states.
+
+Polygenic risk scores assume a causal influence of genotype on disease occurance and independence between model parameters (SNP mutation status).
+
+## 2.) Suppose you have a set of M SNPs associated with a disease/phenotype (say identified at p-value threshold of P), each with an effect size x_i (i indexes the ith SNP of M total SNPs). Specifically, x_i is the odds ratio of the risk allele relative to the non-risk allele for M independent SNPs that are not in LD with one another. You also have SNP data for one individual with the number of risk alleles n_i that correspond to the effect sizes x_i assuming the effects are additive. Write down the formula to compute the PRS for this individual. (2 points)
+
+The effect size in a polygenic-risk-model is described in terms of a log odds-ratio for a given allele status. We can calculate an individuals risk score by multiplying the odds-ratios for disease-specific SNPs. 
+
+
+
+## 3.) Using your GWAS summary statistics for T2D, compute the PRS for each individual in the cases and controls for T2D. Plot a histogram of the distribution of the PRS in cases and controls (in different colors) and indicate the quintiles (20, 40, 60, 80, 100 percentiles of the distribution). (5 points)
+
 - BE careful! Make sure all of your ORs are for the risk allele (reference allele is the non-risk
 allele)!
 - There is an emerging literature on what SNPs to choose for a PRS. For this exercise, use a
