@@ -25,6 +25,8 @@ print(str(args))
 
 data <- import_data(args)
 
+t2d_fc_r <- read_csv(here("NTR4_assignment1/data/T2D_pgr.csv"))
+
 path = paste0(paste0(args$path, args$disease, "_", args$chr_n, "_pgr.csv"))
 
 tmp <- data %>%
