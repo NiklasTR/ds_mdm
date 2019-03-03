@@ -12,7 +12,7 @@ test_ctrl_vs_disease <- function(allele){
   #return(m)
   m %>% chisq.test() %>%
     broom::tidy() %>%
-    dplyr::select(p.value) %>%
+    dplyr::select(p.value, statistic) %>% # select chi
     magrittr::set_colnames(paste0("cd_", colnames(.))) %>%
     mutate(cd_or = (m[2,2]/m[2,1])/(m[1,2]/m[1,1])) %>% return()
   

@@ -158,37 +158,97 @@ for FILE in call_T2D_*; do echo ${FILE}; sbatch ${FILE}; sleep 1; done
 
 ### A.) After filtration, how many SNPs are available for analysis? Why filter out SNPs that deviate from Hardy-Weinberg? What is the Bonferroni-threshold of significance (round to 1 significant figure) (2points).
 
+I import the data
+
+```{r, message=FALSE, warning=FALSE}
+library(here)
+
+t2d <- list.files(here("NTR4_assignment1/data/"), pattern = "T2D_", full.names = TRUE) %>% 
+  # removing the X chromosome file
+  .[!grepl(., pattern = "X")] %>%
+  map(., ~ .x %>% read_csv() %>% mutate(chr_n = as.character(chr_n))) %>% 
+  bind_rows()
+```
+
+Now I filter the data according to my criteria and print the number of rows in the remaining dataset.
+
+```{r}
+t2d_f <- t2d %>% 
+  filter(!hw_p.value < 0.05) %>% 
+  filter(!minor_disease < 0.01)
+
+t2d_f %>% nrow()
+```
+
 ### B.) Compile the GWAS results into one .csv table and call it ‘T2D.csv’ (15 points=10 points for correct findings and format+5 points for correct filtration]).
+
+```{r}
+t2d_f %>% write.csv(here("NTR4_assignment1/data/T2D.csv"))
+```
 
 ## 2.) Analysis of GWAS results:
 ### A.) Produce a manhattan plot and qqplot of the pvalues (2 points).
 
-```{r}
-t2d %>% 
-  mutate(log_p = -log10(cd_p.value))
-  ggplot(aes(x = ,
-             y = ))
+Manhattan Plot
 
-t2d %>% 
-  ggplot(aes(sample = y)) + 
+```{r}
+t2d_f %>% 
+  mutate(log_p = -log10(cd_p.value)) %>%
+  mutate(n = c(1:nrow(.))) %>%
+  ggplot(aes(x = n,
+             color = chr_n,
+             y = log_p)) + 
+  geom_point() + 
+  theme(axis.text.x = element_blank(),
+        legend.position = "none") + 
+  theme_classic() +
+  scale_colour_manual(values=rep(c("#000000", "#E69F00"), times = 11)) + 
+  labs(title = "Manhattan Plot",
+       y = "Log 10 p-value",
+       x = "SNP")
+  
+```
+
+QQ Plot
+
+```{r}
+t2d_f %>% 
+  mutate(log_p = -log10(cd_p.value)) %>%
+  ggplot(aes(sample = log_p)) + 
   stat_qq() + 
   stat_qq_line() + 
   theme_classic() + 
   labs(title = "QQ Plot")
 ```
 
+I am suprised to see these extreme deviations from the theoretical normal distribution. The strongest hits in the dataset have not been linked to specific traits according to dbsnp. Perhaps they are caused by technical artefacts or an implementation error. 
 
 ### B.) How many SNPs were found that exceeded the Bonferroni-level of significance for T2D? (1point)
+
+```{r}
+t2d_f %>% 
+  mutate(fwer = p.adjust(cd_p.value)) %>% 
+  filter(fwer < 0.05) %>% 
+  nrow()
+```
+
+
 ### C.) What could be biasing the associations and how might one control for this phenomenon? (1point)
+
+The associations could be biased by differences in ethnicity between patient cohorts. Moreover, the analysis could be obscured by highly correlated SNPs, that are in a linkage desequalibrium.
 
 ### D.) What is the p-value of association and odds ratio for rs4506565 for T2D? What is the interpretation of the odds ratio? What gene is this SNP associated with and its putative function in T2D pathogenesis? (10 points)
 
 ```{r}
-t2d %>% 
-  filter( == "rs4506565") %>% 
-  
+t2d_f %>% 
+  mutate(fwer = p.adjust(cd_p.value)) %>% 
+  filter(rs_id == "rs4506565") %>% 
+  knitr::kable()
 ```
 
+The SNP in question is located in TCF7L2, a transcription factor linked to the canonical Wnt signaling pathway, which is relevant for proper beta-cell function. It has been linked to an increased risk of T2D in prior studies.
+
+The odds ratio for T2D in our data is 1.37 for the minor "T" allele. Thus, individuals with a "T" variant, instead of "A" have a 37% higher risk of developing T2D compared to unaffected controls.
 
 ## 3.) You just executed an allele frequency test of association. How would the genotypic test of association be different? Second, how would you test both of these types of allele configurations using a logistic regression? (2 points).
 
@@ -214,14 +274,13 @@ The main analytical difference is the scale of evaluation. In a GWAS we perform 
 
 ## 1.) What is a “polygenic risk score”? What is the underlying assumption? (1 point)
 
-A polygenic risk score describes the odds of developing a given complex disease based on an individual's genotype. In practice, a polygenic risk score is often calculated by fitting a logistic regression model based on pre-selected SNP mutation states.
+A polygenic risk score describes the odds of developing a given complex disease based on an individual's genotype. In practice, a polygenic risk score is often calculated by fitting a logistic regression model based on pre-selected SNPs. 
 
-Polygenic risk scores assume a causal influence of genotype on disease occurance and independence between model parameters (SNP mutation status).
+Polygenic risk scores assume a causal influence of genotype on disease occurance and independence between model parameters (SNP mutation status), if not corrected otherwise.
 
 ## 2.) Suppose you have a set of M SNPs associated with a disease/phenotype (say identified at p-value threshold of P), each with an effect size x_i (i indexes the ith SNP of M total SNPs). Specifically, x_i is the odds ratio of the risk allele relative to the non-risk allele for M independent SNPs that are not in LD with one another. You also have SNP data for one individual with the number of risk alleles n_i that correspond to the effect sizes x_i assuming the effects are additive. Write down the formula to compute the PRS for this individual. (2 points)
 
 The effect size in a polygenic-risk-model is described in terms of a log odds-ratio for a given allele status. We can calculate an individuals risk score by multiplying the odds-ratios for disease-specific SNPs. 
-
 
 
 ## 3.) Using your GWAS summary statistics for T2D, compute the PRS for each individual in the cases and controls for T2D. Plot a histogram of the distribution of the PRS in cases and controls (in different colors) and indicate the quintiles (20, 40, 60, 80, 100 percentiles of the distribution). (5 points)
