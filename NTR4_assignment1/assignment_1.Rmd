@@ -175,7 +175,7 @@ Now I filter the data according to my criteria and print the number of rows in t
 ```{r}
 t2d_f <- t2d %>% 
   filter(!hw_p.value < 0.05) %>% 
-  filter(!minor_disease < 0.01)
+  filter(!(minor_disease < 0.01 | minor_ctrl < 0.01))
 
 t2d_f %>% nrow()
 ```
@@ -199,9 +199,9 @@ t2d_f %>%
              color = chr_n,
              y = log_p)) + 
   geom_point() + 
+  theme_classic() +
   theme(axis.text.x = element_blank(),
         legend.position = "none") + 
-  theme_classic() +
   scale_colour_manual(values=rep(c("#000000", "#E69F00"), times = 11)) + 
   labs(title = "Manhattan Plot",
        y = "Log 10 p-value",
@@ -221,13 +221,13 @@ t2d_f %>%
   labs(title = "QQ Plot")
 ```
 
-I am suprised to see these extreme deviations from the theoretical normal distribution. The strongest hits in the dataset have not been linked to specific traits according to dbsnp. Perhaps they are caused by technical artefacts or an implementation error. 
+I am suprised to see these extreme deviations from the theoretical normal distribution. The strongest hits in the dataset have not been linked to specific traits according to dbsnp. Perhaps they are caused by technical artefacts, dysbalances in ethnicicty between groups or an implementation error. 
 
 ### B.) How many SNPs were found that exceeded the Bonferroni-level of significance for T2D? (1point)
 
 ```{r}
 t2d_f %>% 
-  mutate(fwer = p.adjust(cd_p.value)) %>% 
+  mutate(fwer = p.adjust(cd_p.value, method = "bonferroni")) %>% 
   filter(fwer < 0.05) %>% 
   nrow()
 ```
@@ -235,13 +235,13 @@ t2d_f %>%
 
 ### C.) What could be biasing the associations and how might one control for this phenomenon? (1point)
 
-The associations could be biased by differences in ethnicity between patient cohorts. Moreover, the analysis could be obscured by highly correlated SNPs, that are in a linkage desequalibrium.
+The associations could be biased by differences in ethnicity between patient cohorts. Moreover, the analysis could be obscured by highly correlated SNPs, that are in a linkage disequalibrium.
 
 ### D.) What is the p-value of association and odds ratio for rs4506565 for T2D? What is the interpretation of the odds ratio? What gene is this SNP associated with and its putative function in T2D pathogenesis? (10 points)
 
 ```{r}
 t2d_f %>% 
-  mutate(fwer = p.adjust(cd_p.value)) %>% 
+  mutate(fwer = p.adjust(cd_p.value, method = "bonferroni")) %>% 
   filter(rs_id == "rs4506565") %>% 
   knitr::kable()
 ```
@@ -258,29 +258,59 @@ In case of a logistic regression, we would dumbify 2 of the 3 genotype configura
 
 ## 4.) What is the main analytical differences between the test in Background Question 4 (candidate SNP) and GWAS? Why would one want to execute one or the other (1 point)?
 
-The main analytical difference is the scale of evaluation. In a GWAS we perform thousands of tests, while a candidate evalutation only relies on one statistical test. Thus, we need to take great care to control our type-1 error in GWAS studies by multiple-test correction, which reduces our power. This does not apply for the evaluation of a single candidate. Thus, if we have a strong hypothesis and only a limited number of samples, performing a candidate evaluation instead of a GWAS is the most successful strategy.
+The main analytical difference is the scale of evaluation. In a GWAS we perform thousands of tests, while a candidate evalutation only relies on one statistical test. Thus, we need to take great care to control our type-1 error in GWAS studies by multiple-test correction, which reduces our power. This does not apply for the evaluation of a single candidate SNP. Thus, if we have a strong hypothesis and only a limited number of samples, performing a candidate evaluation instead of a GWAS is the most successful strategy.
 
 ## 5.) In question 2B.), you identified sources of biases for GWASs. One source of bias can be controlled for using information from the SNP array. What is this factor? (2 points).
 
+We can compute the principal components of the complete SNP matrix and correct for the first set of prinicpal components. Prior work has shown that prinicpal components are driven by differences in ethnicity. Thus, by accounting for differences in the first prinicipal components, we correct for ethnicity related bias in the analysis.  
 
+## 6.) The genomic inflation factor is arithmetically defined as the median of the observed chi-squared values (a function of the pvalues in GWAS) divided by the median of the expected chi-squared values. Estimate the genomic inflation factor for your GWAS in T2D. What does this quantity estimate? (10 points [5 points for estimate, 5 points for answer]).
 
-## 6.) The genomic inflation factor is arithmetically defined as the median of the observed chi-squared values (a function of the pvalues in GWAS) divided by the median of the expected chi-squared values.
+```{r}
+# We expect the median chi-squared value to be: 
+exp_median = qchisq(0.5,1, lower.tail = FALSE)
 
-## 1). Estimate the genomic inflation factor for your GWAS in T2D. What does this quantity estimate? (10 points [5 points for estimate, 5 points for answer]).
+# I calculate the chi-square statistic based on the test's p-value 
+t2d_f <- t2d_f %>% 
+  mutate(cd_statistic = qchisq(cd_p.value,1, lower.tail = FALSE))
+
+# We calculate the inflation factor and correct by it. 
+lambda = median(t2d_f$cd_statistic)/exp_median
+  
+lambda
+```
+
 
 ## 7.) BONUS. Modify your code to take into account this bias and re-run your associations for ‘Executing GWAS’, Question 1 (10 point bonus).
+
+I add the following peace of code to my analysis to calculate lambda, correct for it and estimate more interpretable p-values after filtering for low-abundance and non-HW-equal. SNPs. I store the resulting table as *T2D_lambda*. I do not need to implement this code in the gwas.R file, as it does not take many ressources to run and the estimation of lambda is more robust when considering the whole genome, instead of a single chromosome at a time.
+
+```{r}
+t2d_fc <- t2d_f %>% 
+  mutate(cd_statistic_correct = cd_statistic/lambda) %>% 
+  mutate(cd_p.value_correct = pchisq(cd_statistic_correct, df=1,lower.tail=FALSE)) 
+
+t2d_fc %>% 
+  write.csv(here("NTR4_assignment1/data/T2D_lambda.csv"))
+
+t2d_fc %>% 
+  dplyr::select(wtccc_id, cd_p.value, cd_p.value_correct) %>% 
+  head() %>% 
+  knitr::kable()
+```
+
 
 # GWAS and Medical Decision Making: Introduction to the Polygenic Risk Score (25 points)
 
 ## 1.) What is a “polygenic risk score”? What is the underlying assumption? (1 point)
 
-A polygenic risk score describes the odds of developing a given complex disease based on an individual's genotype. In practice, a polygenic risk score is often calculated by fitting a logistic regression model based on pre-selected SNPs. 
+A polygenic risk score describes the odds of developing a given complex disease based on an individual's genotype. In practice, a polygenic risk score is often calculated by fitting a logistic regression model based on pre-selected SNPs and applying it to an individuals genotype data. 
 
 Polygenic risk scores assume a causal influence of genotype on disease occurance and independence between model parameters (SNP mutation status), if not corrected otherwise.
 
 ## 2.) Suppose you have a set of M SNPs associated with a disease/phenotype (say identified at p-value threshold of P), each with an effect size x_i (i indexes the ith SNP of M total SNPs). Specifically, x_i is the odds ratio of the risk allele relative to the non-risk allele for M independent SNPs that are not in LD with one another. You also have SNP data for one individual with the number of risk alleles n_i that correspond to the effect sizes x_i assuming the effects are additive. Write down the formula to compute the PRS for this individual. (2 points)
 
-The effect size in a polygenic-risk-model is described in terms of a log odds-ratio for a given allele status. We can calculate an individuals risk score by multiplying the odds-ratios for disease-specific SNPs. 
+The effect size in a polygenic-risk-model is described in terms of a log odds-ratio for a given allele status. We can calculate an individuals risk score by multiplying the (modfified) odds-ratios for disease-specific SNPs. 
 
 
 ## 3.) Using your GWAS summary statistics for T2D, compute the PRS for each individual in the cases and controls for T2D. Plot a histogram of the distribution of the PRS in cases and controls (in different colors) and indicate the quintiles (20, 40, 60, 80, 100 percentiles of the distribution). (5 points)
@@ -290,6 +320,59 @@ allele)!
 - There is an emerging literature on what SNPs to choose for a PRS. For this exercise, use a
 pvalue threshold of 1e-7, HWE pvalue > 0.05 and minor allele frequency of greater than 1% (in
 both cases and controls)
+
+I perform a quick sanity check: The odds-ratio for minor alleles that are more abundant in the control group than the diseased group should be less than 1. 
+
+```{r}
+t2d_fc %>% 
+  dplyr::select(cd_or, major, minor, minor_ctrl, minor_disease) %>%
+  head(500) %>% 
+  mutate(delta = minor_ctrl - minor_disease) %>%
+  ggplot(aes(cd_or, delta)) + 
+  geom_point() + 
+  theme_classic() + 
+  labs(y = "minor_ctrl - minor_disease") + 
+  geom_hline(yintercept = 0) + 
+  geom_vline(xintercept = 1)
+  
+```
+
+Now I filter my data to identify the SNPs I am interested in.
+
+```{r}
+t2d_fc_r <- t2d_fc %>% 
+  filter(hw_p.value > 0.05) %>% 
+  filter(!(minor_disease < 0.01 | minor_ctrl < 0.01)) %>% 
+  filter(cd_p.value < 1e-7)
+```
+
+With this list of SNPs, I load a set of chromosomes and left_join the locations that are relevant for my condition of interest.
+
+```{r}
+library(parallel)
+list.files(path = here("NTR4_assignment1/R"), full.names = TRUE) %>% lapply(., source)
+
+args <- list(path = here("NTR4_assignment1/data"),
+             ctrl = c("58C", "NBS"),
+             disease = "T2D",
+             chr_n = "X")
+
+chr <- c("01", "02", "03", "04", "05", "06", "07", "08", "09", "10",
+         "11", "12", "13", "14", "15", "16", "17", "18", "19", "20",
+         "21", "22")
+
+args_list <- lapply(chr[length(chr)], function(x){args$chr_n <- x; return(args)})
+
+args_list %>% 
+  mclapply(., function(x) import_data(x) %>% 
+           mutate(chr_n = as.character(chr_n)) %>% 
+           filter(wtccc_id %in% t2d_fc_r$wtccc_id)) %>%
+  bind_rows() %>% 
+  
+
+```
+
+
 4.) Suppose you have an individual in the 85th percentile of the PRS distribution for T2D and you are the
 individual’s physician--what do you advise your patient? Suppose another individual is in the 43rd
 percentile--what do you advise this patient? (5 points)

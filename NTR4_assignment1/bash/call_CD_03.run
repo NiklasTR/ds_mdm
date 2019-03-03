@@ -13,4 +13,4 @@
 module load gcc/6.2.0
 module load spider R/3.5.1
 
-Rscript /home/ntr4/ds_mdm/NTR4_assignment1/gwas.R "/home/ntr4/ds_mdm/NTR4_assignment1/data/WTCCC/" "c('58C', 'NBS')" 'CD' '03'
+Rscript /home/ntr4/ds_mdm/NTR4_assignment1/pgr.R "/home/ntr4/ds_mdm/NTR4_assignment1/data/WTCCC/" "c('58C', 'NBS')" 'CD' '03'

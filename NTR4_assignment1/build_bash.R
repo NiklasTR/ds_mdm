@@ -3,7 +3,7 @@ library(dplyr)
 library(stringr)
 library(tidyverse)
 
-line <- read_lines(here("NTR4_assignment1/bash/template"))
+line <- read_lines(here("NTR4_assignment1/bash/template_pgr"))
 
 disease <- c("RA", "T2D", "T1D", "CAD", "CD", "BD")
 chr <- c("01", "02", "03", "04", "05", "06", "07", "08", "09", "10",
