@@ -83,3 +83,6 @@ NTR4_assignment1/data/NBS/snps_info.tar
 NTR4_assignment1/data/NBS/md5_unencrypted
 NTR4_assignment1/data/CD/MD5_Values_encrypted
 NTR4_assignment1/data/CAD/snps_info2.tar
+*.zip
+*.rdb
+*.rdx
