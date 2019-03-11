@@ -1,0 +1,1162 @@
+---
+title: "Assignment 2"
+author: "Niklas Rindtorff"
+date: "3/9/2019"
+output:
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      cache = TRUE)
+```
+
+# Preparation
+
+```{r}
+library(tidyverse)
+library(here)
+library(survey)
+```
+
+
+```{r}
+load("/home/niklas/ds_mdm/NTR4_assignment2/data/assignment2.Rdata")
+```
+
+
+# Background Questions
+
+1. The phenotypes in NHANES are measured during the [home exam](https://www.cdc.gov/nchs/nhanes-ls/index.htm). This exame includes measurment of the BMI and of blood glucose based on a sample from a blood draw.
+2. Both Framingham and Nurses are covering a well-described population. However, the population charactersitics are not representative of the US general population (for example, in terms of sex, ethnicity, socioeconomic status). NHANES recruits participants by taking a top-down approach, actively aiming to preserve representation by [stratified sampling](https://www.cdc.gov/nchs/nhanes/participant/participant-selected.htm)
+3. ![EGPD-Diagram. We are measuing the influence of enviomnental agents of phenotypes that are tightly associated with complex chronic diseases such as diabetes.](/home/niklas/ds_mdm/NTR4_assignment2/ewas.png)
+4. Below are 5 representative codes: 
+  1. LBXBCD Blood Cadmium levels (ug/L)
+  2. LBXHPE Blood Heptachlor Epoxide, a pesticide, levels (ng/g)
+  3. URXP07 Urine 2-phenanthrene, a residue of fossil fuel combustion, (ng/L) levels
+  4. LBXVID Blood Vitamin D levels, measured using a commerical kit
+  5. LBXPFDE Blood Perfluorodecanoic acid levels, a chemical found in surfactants
+
+## Exploring Phenotypes by demographic characteristic
+
+More than 17k patients have BMI data in the dataset.
+
+```{r}
+NHData.train$BMXBMI %>% is.na() %>% table() %>% knitr::kable()
+```
+
+The BMI histogram is skewed, with a long tail towards higher values. The mean and median are shown in the plot title.
+
+```{r}
+mean = NHData.train$BMXBMI %>% 
+  mean(na.rm = TRUE) %>% round(2)
+median = NHData.train$BMXBMI %>% 
+  median(na.rm = TRUE) %>% 
+  round(2)
+
+NHData.train %>% 
+  ggplot(aes(BMXBMI)) + 
+  geom_histogram() + 
+  theme_classic() + 
+  labs(title = "Distribution of BMI in cohort",
+       subtitle = paste0("Mean ", mean, " and Median ", median))
+```
+
+```{r}
+NHData.train %>% 
+  ggplot(aes(RIDAGEYR, BMXBMI)) + 
+  geom_point(alpha = 0.1) + 
+  theme_classic() + 
+  geom_smooth() + 
+  labs(title = "BMI vs. Age")
+```
+
+
+```{r}
+NHData.train %>% 
+  mutate(female = if_else(female == 1, TRUE, FALSE)) %>%
+  ggplot(aes(female, BMXBMI)) + 
+  geom_boxplot() + 
+  theme_classic() + 
+  labs(x = "Self identified female") + 
+  labs(title = "BMI vs. Sex")
+```
+
+```{r}
+NHData.train %>% 
+  dplyr::select(BMXBMI, black:other_eth) %>% 
+  mutate(ethnicity = case_when(
+    black == 1 ~ "black",
+    mexican == 1 ~ "mexican",
+    other_hispanic == 1 ~ "other_hispanic",
+    other_eth == 1 ~ "other_eth",
+    TRUE ~ "white"
+  )) %>%
+  ggplot(aes(ethnicity, BMXBMI)) + 
+  geom_boxplot() + 
+  theme_classic() + 
+  labs(x = "Ethnicity") + 
+  labs(title = "BMI vs. Ethnicity") + 
+  coord_flip()
+```
+
+```{r}
+
+NHData.train %>% 
+  ggplot(aes(INDFMPIR, BMXBMI)) + 
+  geom_point(alpha = 0.1) + 
+  theme_classic() + 
+  geom_smooth() + 
+  labs(title = "BMI vs. Income")
+```
+
+## Summary of plots 
+
+The distribution of BMI values in the population is skewed to the left, with average population BMI on the brink of overweight (BMI = 25). The BMI increases rapidly during childhood and then keeps increasing slowly over time until age 70 before it starts decreasing. 
+
+Sex is not a driving factor of BMI differences. On average the white and mexican population has a higher BMI than the black community. The BMI is lower in individuals that live underneath the average poverty level. 
+
+## Proposed statistical tests
+
+First, I would use the stratified class of glm functions.
+
+* Non-normality can be tested with a Shapiro Wilk test
+* A linear model of BMI vs. age for three separate phases of life can be built (childhood, adulthood, >70)
+* A linear model of BMI vs. sex can be trained. The model will give an estimate of significance. 
+* A similar linear model with multiple dumbified variables can be fitted for BMI vs. ethnicity. 
+* A linear model of BMI vs. INDFMPIR can test the final hypothesis.
+
+## Modeling hypothesis 
+
+Definint training data 
+
+```{r}
+dsn <- svydesign(ids=~SDMVPSU,
+                 strata=~SDMVSTRA,
+                 weights=~WTMEC2YR,
+                 nest=T, 
+                 data=NHData.train)
+```
+
+
+BMI vs. age (one linear model)
+
+```{r}
+mod <-svyglm(BMXBMI ~ RIDAGEYR, dsn)
+summary(mod)
+```
+
+There is a significant association. One year of age corresponds to an BMI increase of 0.15kg
+
+The influence of sex on BMI:
+
+```{r}
+mod <-svyglm(BMXBMI ~ female, dsn)
+summary(mod)
+```
+
+Being a female is significantly linked to an increased BMI. Being female increase the expected  BMI by 0.46 points.
+
+```{r}
+mod <-svyglm(BMXBMI ~ black + mexican + other_hispanic + other_eth, dsn)
+
+summary(mod)
+```
+
+Black, Mexican and other ethncities have a significant contribution to expected BMI. Different from my visual interpretation, black ethnicity is linked to an increased BMI (+0.63 points), while Mexican ethnicity is linked to a decreased expected BMI (-0.68 points).
+
+## Repeating everything for fasting glucose
+
+The BMI histogram is skewed, with a long tail towards higher values. The mean and median are shown in the plot title.
+
+```{r}
+mean = NHData.train$LBXGLU %>% 
+  mean(na.rm = TRUE) %>% round(2)
+median = NHData.train$LBXGLU %>% 
+  median(na.rm = TRUE) %>% 
+  round(2)
+
+NHData.train %>% 
+  ggplot(aes(LBXGLU)) + 
+  geom_histogram() + 
+  theme_classic() + 
+  labs(title = "Distribution of Plasma Glucose in cohort",
+       subtitle = paste0("Mean ", mean, " and Median ", median))
+```
+
+```{r}
+NHData.train %>% 
+  ggplot(aes(RIDAGEYR, LBXGLU)) + 
+  geom_point(alpha = 0.1) + 
+  theme_classic() + 
+  geom_smooth() + 
+  labs(title = "Glucose vs. Age") + 
+  scale_y_log10()
+```
+
+
+```{r}
+NHData.train %>% 
+  mutate(female = if_else(female == 1, TRUE, FALSE)) %>%
+  ggplot(aes(female, LBXGLU)) + 
+  geom_boxplot() + 
+  theme_classic() + 
+  labs(x = "Self identified female") + 
+  labs(title = "Glucose vs. Sex") + 
+  scale_y_log10()
+```
+
+```{r}
+NHData.train %>% 
+  dplyr::select(LBXGLU, black:other_eth) %>% 
+  mutate(ethnicity = case_when(
+    black == 1 ~ "black",
+    mexican == 1 ~ "mexican",
+    other_hispanic == 1 ~ "other_hispanic",
+    other_eth == 1 ~ "other_eth",
+    TRUE ~ "white"
+  )) %>%
+  ggplot(aes(ethnicity, LBXGLU)) + 
+  geom_boxplot() + 
+  theme_classic() + 
+  labs(x = "Ethnicity") + 
+  labs(title = "Glucose vs. Ethnicity") + 
+  coord_flip() + 
+  scale_y_log10()
+```
+
+```{r}
+
+NHData.train %>% 
+  ggplot(aes(INDFMPIR, LBXGLU)) + 
+  geom_point(alpha = 0.1) + 
+  theme_classic() + 
+  geom_smooth() + 
+  labs(title = "Gluose vs. Income") + 
+  scale_y_log10()
+```
+
+## Summary of plots 
+
+The distribution of Glucose values in the population is skewed to the left, with average population Glucose in the normal range. Plasma Glucose values increase increase slightly around age 70.
+
+Male sex is linked to increased Glucose levels. On average the black and mexican population has higher Glucose levels. The average Glucose readings are constant across income levels, with increased observations of high readings around the poverty line. 
+
+## Proposed statistical tests
+
+First, I would use the stratified class of glm functions.
+
+* Non-normality can be tested with a Shapiro Wilk test
+* A linear model of Glucose vs. age can be built 
+* A linear model of Glucose vs. sex can be trained. The model will give an estimate of significance. 
+* A similar linear model with multiple dumbified variables can be fitted for Glucose vs. ethnicity. 
+* A linear model of Glucose vs. INDFMPIR can test the final hypothesis.
+
+## Modeling hypothesis 
+
+Definint training data 
+
+```{r}
+dsn <- svydesign(ids=~SDMVPSU,
+                 strata=~SDMVSTRA,
+                 weights=~WTMEC2YR,
+                 nest=T, 
+                 data=NHData.train)
+```
+
+
+Glucose vs. age (one linear model)
+
+```{r}
+mod <-svyglm(LBXGLU ~ RIDAGEYR, dsn)
+summary(mod)
+```
+
+There is a significant association. One year of age corresponds to an Glucose level increase of 0.39 mg/ml
+
+The influence of sex on BMI:
+
+```{r}
+mod <-svyglm(LBXGLU ~ female, dsn)
+summary(mod)
+```
+
+Being a female is significantly linked to an decreased expected Blood Glucose. Being female decreases the expected  Glucose by 4.8 mg/ml in contrast to males.
+
+```{r}
+mod <-svyglm(LBXGLU ~ black + mexican + other_hispanic + other_eth, dsn)
+
+summary(mod)
+```
+
+There are no significant associations between ethnicity and Blood Glucose levels.
+
+## Comparing demographics of Blood Glucose levels and BMI 
+
+Both BMI and Glucose levels are influenced by age. As age increases so does the expected BMI and blood Glucose levels. 
+
+For both metrics we can observe a significant effect of participant's sex. While female sex is linked to a higher BMI, it is also associated with lower expected blood Glucose levels. 
+
+In terms of ethnicity, we can observe an influence on expected BMI, but not for expected blood Glucose levels. 
+
+## Exploring enviromnental variables
+
+The distribution of serum lead is log-normal.
+
+```{r}
+
+NHData.train %>% 
+  ggplot(aes(LBXBPB)) + 
+  geom_histogram() + 
+  theme_classic() + 
+  scale_x_log10() + 
+  labs(title = "Log-Normal Serum Lead distribution",
+       subtitle = "note the log10 scale on the x axis")
+
+```
+
+A possible way to transform this variable is to perform a log10 based rescaling. This makes the data more normally distributed, as it forces the more extreme values to come closer to the distribution's mean. 
+
+Operating with normally distributed values makes the interpretation of a model's coefficients easier. In addition to this, the chance that the normality assumption for the model's error terms is kept is higher. 
+
+```{r}
+NHData.train %>% 
+  ggplot(aes(RIDAGEYR, LBXBPB)) + 
+  geom_point(alpha = 0.2) +
+  geom_smooth() + 
+  
+  theme_classic() + 
+  scale_y_log10() + 
+  labs(title = "Log-Normal Serum lead levels vs. age",
+       subtitle = "note the log10 scale on the y axis")
+```
+
+```{r}
+NHData.train %>% 
+  mutate(female = if_else(female == 1, TRUE, FALSE)) %>%
+  ggplot(aes(female, LBXBPB)) + 
+  geom_boxplot() + 
+  theme_classic() + 
+  labs(x = "Self identified female") + 
+  labs(title = "Serum lead levels vs. Sex") + 
+  scale_y_log10()
+```
+
+```{r}
+NHData.train %>% 
+  dplyr::select(LBXBPB, black:other_eth) %>% 
+  mutate(ethnicity = case_when(
+    black == 1 ~ "black",
+    mexican == 1 ~ "mexican",
+    other_hispanic == 1 ~ "other_hispanic",
+    other_eth == 1 ~ "other_eth",
+    TRUE ~ "white"
+  )) %>%
+  ggplot(aes(ethnicity, LBXBPB)) + 
+  geom_boxplot() + 
+  theme_classic() + 
+  labs(x = "Ethnicity") + 
+  labs(title = "Serum lead vs. Ethnicity") + 
+  coord_flip() + 
+  scale_y_log10()
+```
+
+```{r}
+NHData.train %>% 
+  ggplot(aes(INDFMPIR, LBXBPB)) + 
+  geom_point(alpha = 0.1) + 
+  theme_bw() + 
+  geom_smooth() + 
+  labs(title = "Serum lead vs. Income",
+       subtitle = "we see a slight decrease of lead levvels, as income increases") + 
+  scale_y_log10()
+```
+
+## Modeling Serum lead levels
+
+Definint training data 
+
+```{r}
+dsn <- svydesign(ids=~SDMVPSU,
+                 strata=~SDMVSTRA,
+                 weights=~WTMEC2YR,
+                 nest=T, 
+                 data=NHData.train)
+```
+
+
+Serum lead vs. age (one linear model)
+
+```{r}
+mod <-svyglm(LBXBPB ~ RIDAGEYR, dsn)
+summary(mod)
+```
+
+There is a significant association. One year of age corresponds to an increase in serum lead levels of 0.017. 
+
+The influence of sex on Serum lead:
+
+```{r}
+mod <-svyglm(LBXBPB ~ female, dsn)
+summary(mod)
+```
+
+Being a female is significantly linked to an decreased expected Serum lead levels. Being female decreases the expected  Serum lead level by 0.78 in contrast to males.
+
+```{r}
+mod <-svyglm(LBXBPB ~ black + mexican + other_hispanic + other_eth, dsn)
+
+summary(mod)
+```
+
+Mexican and black participants have higher expected values of Serum lead (+0.27, +0.36, respectively). 
+
+## Repeating everything for Vitamin D
+
+The distribution of serum lead is log-normal.
+
+```{r}
+
+NHData.train %>% 
+  ggplot(aes(LBXVID)) + 
+  geom_histogram() + 
+  theme_classic() + 
+  scale_x_log10() + 
+  labs(title = "Log-Normal Vitamin D distribution",
+       subtitle = "note the log10 scale on the x axis")
+
+```
+
+A possible way to transform this variable is to perform a log10 based rescaling. This makes the data more normally distributed, as it forces the more extreme values to come closer to the distribution's mean. 
+
+Operating with normally distributed values makes the interpretation of a model's coefficients easier. In addition to this, the chance that the normality assumption for the model's error terms is kept is higher. 
+
+```{r}
+NHData.train %>% 
+  ggplot(aes(RIDAGEYR, LBXVID)) + 
+  geom_point(alpha = 0.2) +
+  geom_smooth() + 
+  
+  theme_classic() + 
+  scale_y_log10() + 
+  labs(title = "Log-Normal Vitamin D levels vs. age",
+       subtitle = "note the log10 scale on the y axis")
+```
+
+```{r}
+NHData.train %>% 
+  mutate(female = if_else(female == 1, TRUE, FALSE)) %>%
+  ggplot(aes(female, LBXVID)) + 
+  geom_boxplot() + 
+  theme_classic() + 
+  labs(x = "Self identified female") + 
+  labs(title = "Serum Vitamin D levels vs. Sex") + 
+  scale_y_log10()
+```
+
+```{r}
+NHData.train %>% 
+  dplyr::select(LBXVID, black:other_eth) %>% 
+  mutate(ethnicity = case_when(
+    black == 1 ~ "black",
+    mexican == 1 ~ "mexican",
+    other_hispanic == 1 ~ "other_hispanic",
+    other_eth == 1 ~ "other_eth",
+    TRUE ~ "white"
+  )) %>%
+  ggplot(aes(ethnicity, LBXVID)) + 
+  geom_boxplot() + 
+  theme_classic() + 
+  labs(x = "Ethnicity") + 
+  labs(title = "Serum Vitamin D vs. Ethnicity",
+       subtitle = "We can see clear differences \nin Vitamin D levels, which are directly \nlinked to the skin tone") + 
+  coord_flip() + 
+  scale_y_log10()
+```
+
+```{r}
+NHData.train %>% 
+  ggplot(aes(INDFMPIR, LBXVID)) + 
+  geom_point(alpha = 0.1) + 
+  theme_bw() + 
+  geom_smooth() + 
+  labs(title = "Serum Vitamin D vs. Income",
+       subtitle = "we see a slight increase of Vitamin D levels, as income increases") + 
+  scale_y_log10()
+```
+
+## Modeling Serum lead levels
+
+Defining training data 
+
+```{r}
+dsn <- svydesign(ids=~SDMVPSU,
+                 strata=~SDMVSTRA,
+                 weights=~WTMEC2YR,
+                 nest=T, 
+                 data=NHData.train)
+```
+
+
+Vitamin D vs. age (one linear model)
+
+```{r}
+mod <-svyglm(LBXVID ~ RIDAGEYR, dsn)
+summary(mod)
+```
+
+There is a significant association. One year of age corresponds to a drop of serum Vitamin D levels of 0.03. 
+
+The influence of sex on Vitamin D:
+
+```{r}
+mod <-svyglm(LBXVID ~ female, dsn)
+summary(mod)
+```
+
+Being a female is significantly linked to decreased expected Serum Vitamin D levels. Being female decreases the expected Serum Vitamin D level by 0.86 relative to males.
+
+```{r}
+mod <-svyglm(LBXVID ~ black + mexican + other_hispanic + other_eth, dsn)
+
+summary(mod)
+```
+
+All non-white ethnicities are linked to lower expected Vitamin D levels. The reduction in Vitamin D levels is linked to the average skin tone, with black participants having the lowest average Vitamin D levels (-11) followed by Mexicans (-5). 
+
+## Demographic variables as confounders
+
+Demographic variables could be a confounder for both the association of lead to BMI and serum glucose.
+
+Lead is an enviromnental toxin formerly emmited by gasoline combustion and now found in old paints, food and dust. 
+
+The exposure of lead has a proven gradient over socioeconomic groups, sexes and ethnicities, with poorer parts of the population, males and minorities having higher blood lead levels. 
+ 
+Especially BMI has a similar link to ethnicity. Thus, when modeling BMI as a function of lead exposure, models should be corrected for differences in ethnicity.
+
+Similarly, when modeling blood glucose as a function of lead exposure, models should be corrected for differences in sex. 
+
+In the case of Vitamin D, similar confounders should be expected. Vitamin D levels are a proven function of skin tone and thus highly influenced by ethnicity. Moreover, there is a significant link between sex and Vitamin D levels. 
+
+When modeling BMI as a function of Vitamin D, we should control for ethnicity and other covariates. 
+
+When modeling serum Glucose as a function of Vitamin D, we should control for sex and other potential confounders.
+
+The discussed variables, lead and Vitamin D, are most likely not mediators, but confounders of the observed outcomes. 
+
+# Executing environment-wide associations
+
+I source the *run_ewas* function I defined.
+
+```{r}
+source("/home/niklas/ds_mdm/NTR4_assignment2/R/ewas.R")
+```
+
+```{r}
+library(parallel)
+
+ExposureList = ExposureList[-133]
+ExposureList = ExposureList[-150]
+
+fasting_glucose_train <- ExposureList %>% 
+  lapply(., run_ewas, 
+           target = "LBXGLU",
+           modification_target = "scale(log(x))",
+           nhd = NHData.train,
+           description = ExposureDescription) %>% 
+  bind_rows() %>% 
+  mutate(fdr = p.adjust(pvalue, method = "BH"))
+
+fasting_glucose_test <- ExposureList %>% 
+  lapply(., run_ewas, 
+           target = "LBXGLU",
+           modification_target = "scale(log(x))",
+           nhd = NHData.test,
+           description = ExposureDescription) %>% 
+  bind_rows()%>% 
+  mutate(fdr = p.adjust(pvalue, method = "BH"))
+
+bmi_train <- ExposureList %>% 
+  lapply(., run_ewas, 
+           target = "BMXBMI",
+           modification_target = "scale(x)",
+           nhd = NHData.train,
+           description = ExposureDescription) %>% 
+  bind_rows()%>% 
+  mutate(fdr = p.adjust(pvalue, method = "BH"))
+
+bmi_test <- ExposureList[-150] %>%
+  lapply(., run_ewas, 
+           target = "LBXGLU",
+           modification_target = "scale(x)",
+           nhd = NHData.test,
+           description = ExposureDescription) %>% 
+  bind_rows()%>% 
+  mutate(fdr = p.adjust(pvalue, method = "BH"))
+
+```
+
+I write my results 
+
+```{r}
+fasting_glucose_train %>%
+  write_csv("/home/niklas/ds_mdm/NTR4_assignment2/data/fasting_glucose_train.csv")
+
+fasting_glucose_test %>%
+  write_csv("/home/niklas/ds_mdm/NTR4_assignment2/data/fasting_glucose_test.csv")
+
+bmi_train %>% 
+  write_csv("/home/niklas/ds_mdm/NTR4_assignment2/data/bmi_train.csv")
+
+bmi_test %>% 
+  write_csv("/home/niklas/ds_mdm/NTR4_assignment2/data/bmi_test.csv")
+```
+
+## Analysis of EWAS results 
+
+```{r}
+library(patchwork)
+
+fasting_glucose_train %>%
+  filter(exposure_id != "URXUPT") %>%
+  # The exposure URXUPT has an extreme estimated effect with a very strong std_error.
+  mutate(log_pvalue = -log10(pvalue)) %>%
+  ggplot(aes(estimate, log_pvalue)) + 
+  geom_point() + 
+  theme_classic() + 
+  labs(title = "fasting glucose") +
+bmi_train %>%
+  mutate(log_pvalue = -log10(pvalue)) %>%
+  ggplot(aes(estimate, log_pvalue)) + 
+  geom_point() + 
+  theme_classic() + 
+  labs(title = "bmi")
+```
+
+The plot is showing the impact of environmental factors on our target phenotype. Exposures that do not have a significant and measurable effect are in the bottom center. Exposures that are on the extreme ends have high -log10(p) and a high effect size estimate.
+
+It is useful to scale all non-binary variables so the effect-size estimate can be interpreted as a unit-less measure of standard deviation from the mean for a given outcome measure.
+
+One way to identify the corresponding p-value for a given FDR is looking for the pvalue of measurments that are close to the FDR of interest.
+
+```{r, warning=FALSE, message=FALSE}
+fasting_glucose_train %>% 
+  mutate(fdr_r = round(fdr, 2)) %>% 
+  ggplot(aes(fdr, pvalue)) + 
+  geom_point() + 
+  scale_x_log10(limits = c(0.001, 1)) + 
+  scale_y_log10(limits = c(0.00001, 1)) + 
+  theme_bw() + 
+  geom_smooth() + 
+  geom_vline(xintercept = 0.05) + 
+  geom_vline(xintercept = 0.01) + 
+  labs(title = "Fasting Glucose") + 
+bmi_train %>% 
+  mutate(fdr_r = round(fdr, 2)) %>% 
+  ggplot(aes(fdr, pvalue)) + 
+  geom_point() + 
+  scale_x_log10(limits = c(0.001, 1)) + 
+  scale_y_log10(limits = c(0.00001, 1)) + 
+  theme_bw() + 
+  geom_smooth() + 
+  geom_vline(xintercept = 0.05) + 
+  geom_vline(xintercept = 0.01) + 
+  labs(title = "BMI") 
+```
+
+In our case the p-values corresponding to an FDR of 5% and 1% are 0.0023 and 0.0003, respectively. This applies for the fasting glucose training dataset.
+
+## Identifying replicated findings 
+
+```{r}
+identify_consens <- function(df_train, df_test){
+df_train %>% 
+  filter(fdr < 0.1) %>% 
+  mutate(direction_train = if_else(estimate < 0, 
+                                   0, 1)) %>% 
+  dplyr::select(exposure_id, direction_train) %>% 
+  left_join(.,
+    df_test %>% 
+    filter(fdr < 0.1) %>% 
+    mutate(direction_test = if_else(estimate < 0, 
+                                    0, 1)) %>% 
+  dplyr::select(exposure_id, direction_test), 
+  by = "exposure_id") %>% 
+  drop_na() %>% 
+  mutate(consens = if_else(direction_train == direction_test, 1, 0)) %>% 
+  filter(consens == 1) %>% 
+  .$exposure_id %>% 
+    return()
+}
+
+identify_consens(fasting_glucose_train,
+                 fasting_glucose_test) %>% length()
+
+identify_consens(bmi_train,
+                 bmi_test) %>% length()
+
+```
+
+We identify 6 variables for fasting_glucose and 7 variables for bmi. 
+
+## Interpreting findings
+
+### Fasting Glucose
+
+```{r}
+fasting_glucose_test %>% 
+  filter(exposure_id %in% identify_consens(fasting_glucose_train,
+                 fasting_glucose_test)) %>% 
+  arrange(fdr) %>% 
+  head(3) %>% knitr::kable()
+```
+
+Vitamin D and B-carotene reduce the fasting glucose in the population by 0.104/0.114 standard deviations for every one-standard-deviation increase of metabolite levels. 
+
+In contrast, Tocopherol, a Vitamin E derivative, increase the fasting glucose in the population by 0.17 standard deviations for every one-standard-deviation increase of metabolite levels.
+
+### BMI 
+
+```{r}
+bmi_test %>% 
+  filter(exposure_id %in% identify_consens(bmi_train,
+                 bmi_test)) %>% 
+  arrange(fdr) %>% 
+  head(3) %>% knitr::kable()
+```
+
+Vitamin D and Platinum exposure reduces the BMI in the population by 0.16/0.087 standard deviations for every one-standard-deviation increase of metabolite levels. 
+
+In contrast, Tocopherol, a Vitamin E derivative, increase the BMI in the population by 0.17 standard deviations for every one-standard-deviation increase of metabolite levels.
+
+It is interesting to see the same metabolites being associated with these two related, but distinct, phenotypes.
+
+I now plot the correlation of the estimates for BMI and fasting glucose 
+
+```{r}
+library(ggrepel)
+
+df <- bmi_train %>% 
+  filter(exposure_id != "URXUPT") %>%
+  # The exposure URXUPT has an extreme estimate
+  dplyr::select(exposure_id, 
+                estimate_bmi = estimate) %>% 
+  left_join(fasting_glucose_train %>% 
+              filter(exposure_id != "URXUPT") %>%
+  # The exposure URXUPT has an extreme estimate
+              dplyr::select(exposure_id,
+                            estimate_glucose = estimate)) 
+
+r <- cor(df$estimate_bmi, df$estimate_glucose) %>% round(2)
+
+df %>% 
+  ggplot(aes(estimate_bmi, estimate_glucose, label = exposure_id)) + 
+  geom_point() +
+  geom_text_repel(data = df %>% filter(abs(estimate_glucose) > .15)) + 
+  geom_smooth(formula = y ~ x, method = "lm") + 
+  theme_bw() + 
+  labs(title = paste0("Pearson r=", r))
+```
+
+We can see an overall moderate to high correlation for the impact of envionmental agents on BMI and fasting glucose levels. Two agents, LBXGTC (Tocopherol) and LBXHPE (Heptachlor Epoxide, a dioxine) are linked to an increased BMI and fasting glucose. In contrast, the agent URXUCO (urine cobals) is linked to reduced fasting glucose levels, while not influencing the expected bmi in the population.
+
+Overall, this plot supports the prior observation, that the effects of envionmental agents on BMI and fasting glucose are highly related. Given the pathopysiological link between obesity and elevated blood glucose levels, these results are not suprising.
+
+## Cross-correlation 
+
+```{r}
+
+columns <- c(identify_consens(bmi_train, bmi_test),
+             identify_consens(fasting_glucose_train,
+                   fasting_glucose_test)) %>% 
+  unique()
+
+cor_mat <- NHData.test %>% 
+  dplyr::select(columns) %>%
+  as.matrix() %>%
+  cor(use = "pairwise.complete.obs") 
+
+cor_mat %>% 
+  pheatmap::pheatmap()
+```
+
+The observed correlations in exposome data are markedly elevated when compared to typical LD information. According to this [publication](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1560400/) the maximum correlation between genetic loci is expected to be around r=0.46. Environmental exposures can correlate with up to r=0.66. This makes the definition of causal hypothesis linking one agent to a specific phenotype increasingly difficult.
+
+```{r}
+cor_mat %>% hist()
+```
+
+## Potential sources of bias 
+
+**Selection bias:** Currently, they are no exposome-wide profiling methods that, comparable to a SNP-array, can profile the majority of simple and complex substances in the enviromnent. Thus, most variables that are assessed are pre-selected for financial and technical reasons. 
+
+**Confounding bias:** Given the high correlation between environmental variables it is very likely that a large number of agents are stemming from the same source, such as fossil fuel combustion or mining. The combination of (I) selective measurements of environmental variables because of technical constraints and (II) a strong bias towards shared sources of emission markedly increase the probability of associating confounding variables with an observed phenotype.
+
+**Reverse causality:** A potential example for reverse causality could be the observation of high tocopherol levels in patients with high BMI. Patients with high BMI have a larger body fat content. Tocopherol and other lipid soluble vitamins (A, D, E, K) are stored in fatty tissue. Instead of high tocopherol levels causing an increased BMI, elevated tocopherol levels could be a consequence of increased fatty tissue in an obese participants organism. 
+
+## Other applications 
+
+EWAS related variables do not necessarily need to be measured by body fluid samples. Instead, behavioral data, such as GPS traces can be linked to physical samples such air quality or soil contaminants instead. While the approach to data collection is different, the underlying analysis strategy would be very similar to an EWAS. 
+
+GWAS studies are mostly performed on SNP-array data. However, also variants from exome-sequencing data can be used for analysis. This can be relevant for linking somatic mutations, for example in cancer, to an outcome.
+
+# Machine learning - prediction of exposome indicators in body mass index
+
+## Defining the coefficient of variation
+
+R-squared is defined as 1 - the ratio of the residual sum-of-squares (SSres) and the total sum-of-squares (SStot). 
+
+SStot is defined as the sum of squared differences between the mean of a dataset and the individual elements of the dataset. It is closely related to the variance.
+
+SSres is defined as the sum of squared differences between the predicted value of an individual element and the corresponding ground truth in a dataset.
+
+A model with a high R-sqaured coefficient of variance has a very low ratio of SSres to SStot. Most of the variance in the data is captured in the model. The variance of the model's prediction and ground-truth is very small in comparisson.
+
+## Estimating COV for demographic variables 
+
+```{r}
+target = "scale(BMXBMI)"
+
+covariates <- c("female",
+                "black", 
+                "mexican",
+                "other_hispanic",
+                "other_eth",
+                "scale(RIDAGEYR)",
+                "scale(INDFMPIR)")
+
+input <- c(covariates)
+ 
+ f <- as.formula(
+    paste(
+      paste0(target," ~"), 
+      paste(input, collapse="+")
+      )
+     )
+
+model_train <- lm(formula = f,
+            data = NHData.train)
+model_test <- lm(formula = f,
+            data = NHData.test)
+
+# The coefficient of variance is: 
+r2_basis <- c(
+summary(model_train)$r.squared,
+summary(model_test)$r.squared)
+
+r2_basis
+r2_basis %>% mean()
+```
+
+Adding the strongest finding results in the following r-squared: 
+
+```{r}
+target = "scale(BMXBMI)"
+
+covariates <- c("female",
+                "black", 
+                "mexican",
+                "other_hispanic",
+                "other_eth",
+                "scale(RIDAGEYR)",
+                "scale(URXUPT)", 
+            #   "scale(LBXVID)", 
+            #    "scale(LBXGTC)",
+                "scale(INDFMPIR)")
+
+input <- c(covariates)
+ 
+ f <- as.formula(
+    paste(
+      paste0(target," ~"), 
+      paste(input, collapse="+")
+      )
+     )
+
+model_train <- lm(formula = f,
+            data = NHData.train)
+model_test <- lm(formula = f,
+            data = NHData.test)
+
+model <- lm(formula = f,
+            data = NHData.train)
+
+# The coefficient of variance is: 
+r2_top1 <- c(
+summary(model_train)$r.squared,
+summary(model_test)$r.squared)
+
+r2_top1
+r2_top1 %>% mean()
+```
+
+The R-squared of the model that included the top-variable dropped! The hit from our analysis is actually decreasing the model's fit by a 0.006 of variance.
+
+```{r}
+target = "scale(BMXBMI)"
+
+covariates <- c("female",
+                "black", 
+                "mexican",
+                "other_hispanic",
+                "other_eth",
+                "scale(RIDAGEYR)",
+                "scale(URXUPT)", 
+              "scale(LBXVID)", 
+                "scale(LBXGTC)",
+                "scale(INDFMPIR)")
+
+input <- c(covariates)
+ 
+ f <- as.formula(
+    paste(
+      paste0(target," ~"), 
+      paste(input, collapse="+")
+      )
+     )
+
+model_train <- lm(formula = f,
+            data = NHData.train)
+model_test <- lm(formula = f,
+            data = NHData.test)
+
+model <- lm(formula = f,
+            data = NHData.train)
+
+# The coefficient of variance is: 
+r2_top1 <- c(
+summary(model_train)$r.squared,
+summary(model_test)$r.squared)
+
+r2_top1
+r2_top1 %>% mean()
+```
+
+The model that includes our top 3-variables has a better fit to the data than the 1-variable model, but a comparable performance to the baseline. The performance difference is -0.08. 
+
+## Interpreting model perfomance
+
+The model's performance does not markedly increase by adding the 3 covariates. 
+
+On a new dataset I would expect there to be no benefit to the explained variance, as the variables have been picked based on the present dataset and there is a considerable risk of overfitting.
+
+# Bonus 
+
+## Defining a cross-sectional study 
+
+A cross-sectional study measures the prevalence of a set of phenotypes, conditions and attributes at a single moment in time in a specific population. In contrast to longitudonal study designs, which follow-up on participants over time, the ability to generate causal hypothesis is limited.
+
+## Considerations: time to death
+
+We can implement three different modeling approches: 
+1. We can fit a logistic regression to identify individuals that die before a given age/timepoint
+1. We can fit a linear regression to predict the time of survival after observing the patient
+1. We can fit a cox proportional hazard model to predict survival, assuming a proportional hazard for different subgroups in the cohort. 
+
+## Modeling: time to death
+
+```{r}
+covariates <- c("female",
+                "black", 
+                "mexican",
+                "other_hispanic",
+                "other_eth",
+                "scale(RIDAGEYR)",
+            #   "scale(URXUPT)", 
+            #   "scale(LBXVID)", 
+            #    "scale(LBXGTC)",
+                "scale(INDFMPIR)")
+
+input <- c(covariates)
+ 
+ f <- as.formula(
+    paste(
+      paste0("PERMTH_EXM ~"), 
+      paste(input, collapse="+")
+      )
+     )
+
+dsn <- svydesign(ids=~SDMVPSU,
+                   strata=~SDMVSTRA,
+                   weights=~WTMEC2YR,
+                   nest=T, 
+                   data=NHData.train %>%
+                   dplyr::filter(MORTSTAT == 1))
+ 
+model_lm <- svyglm(f, 
+                    design = dsn)
+
+summary(model_lm)
+```
+
+Trying to model the time to death using a stratified linear model only returns black ethnicity as a significant coefficient. 
+
+As an alternative, I fit a logistic regression model on the whole training dataset and try to predict the death of participants at the end of the follow-up period (below). This model has multiple variables with significant contribution, including age, sex and income.
+
+```{r}
+
+covariates <- c("female",
+                "black", 
+                "mexican",
+                "other_hispanic",
+                "other_eth",
+                "scale(RIDAGEYR)",
+            #    "scale(URXUPT)", 
+            #   "scale(LBXVID)", 
+            #    "scale(LBXGTC)",
+                "scale(INDFMPIR)")
+
+input <- c(covariates)
+ 
+ f <- as.formula(
+    paste(
+      paste0("MORTSTAT ~"), 
+      paste(input, collapse="+")
+      )
+     )
+ 
+ dsn <- svydesign(ids=~SDMVPSU,
+                   strata=~SDMVSTRA,
+                   weights=~WTMEC2YR,
+                   nest=T, 
+                   data=NHData.train)
+ 
+model_log <- svyglm(f, 
+                    design = dsn,
+                    family=quasibinomial)
+
+summary(model_log)
+```
+
+Now I include my hit covariates into the model
+
+```{r}
+covariates <- c("female",
+                "black", 
+                "mexican",
+                "other_hispanic",
+                "other_eth",
+                "scale(RIDAGEYR)",
+                "scale(URXUPT)", 
+              "scale(LBXVID)", 
+               "scale(LBXGTC)",
+                "scale(INDFMPIR)")
+
+input <- c(covariates)
+ 
+ f <- as.formula(
+    paste(
+      paste0("MORTSTAT ~"), 
+      paste(input, collapse="+")
+      )
+     )
+ 
+ dsn <- svydesign(ids=~SDMVPSU,
+                   strata=~SDMVSTRA,
+                   weights=~WTMEC2YR,
+                   nest=T, 
+                   data=NHData.train)
+ 
+model_log <- svyglm(f, 
+                    design = dsn,
+                    family=quasibinomial)
+
+summary(model_log)
+```
+
+Our candidate variables do not add a significant coefficient to the model.
+
+Finally, I fit a cox proportional hazard model to the data.
+
+
+```{r}
+library(survminer)
+
+covariates <- c("female",
+                "black", 
+                "mexican",
+                "other_hispanic",
+                "other_eth",
+                "scale(RIDAGEYR)",
+              #   "scale(URXUPT)", 
+              # "scale(LBXVID)", 
+              #  "scale(LBXGTC)",
+                "scale(INDFMPIR)")
+
+input <- c(covariates)
+
+ f <- as.formula(
+    paste(
+      paste0("Surv(PERMTH_EXM, MORTSTAT)  ~"), 
+      paste(input, collapse="+")
+      )
+     )
+ 
+model_cox <- coxph(f, data = NHData.train)
+
+summary(model_cox)
+
+```
+
+This (above) is the cox model without environmental covariates. Most demographic variables influence the hazard of death.
+
+```{r}
+covariates <- c("female",
+                "black", 
+                "mexican",
+                "other_hispanic",
+                "other_eth",
+                "scale(RIDAGEYR)",
+                "scale(URXUPT)",
+              #"scale(LBXVID)",
+              # "scale(LBXGTC)",
+                "scale(INDFMPIR)")
+
+input <- c(covariates)
+
+ f <- as.formula(
+    paste(
+      paste0("Surv(PERMTH_EXM, MORTSTAT)  ~"), 
+      paste(input, collapse="+")
+      )
+     )
+ 
+model_cox <- coxph(f, data = NHData.train)
+
+summary(model_cox)
+```
+
+None of the top 3 BMI related exposures increases the explained variance, when added all at the same time. After restricting the variables to only one BMI-linked feature, Urine Platinum levels, this variable has a significant coefficient.
+
+The hazard ratio of scaled Urine Platinum is 1.88. An increase in urine platinum levels by one standard deviation increases the hazard of death at a given timepoint by 88%. 
+
+Below I show an example of a cox model with no significant coefficient for the shared variable LBXGTC.
+
+```{r}
+covariates <- c("female",
+                "black", 
+                "mexican",
+                "other_hispanic",
+                "other_eth",
+                "scale(RIDAGEYR)",
+               # "scale(URXUPT)",
+              #"scale(LBXVID)",
+               "scale(LBXGTC)",
+                "scale(INDFMPIR)")
+
+input <- c(covariates)
+
+ f <- as.formula(
+    paste(
+      paste0("Surv(PERMTH_EXM, MORTSTAT)  ~"), 
+      paste(input, collapse="+")
+      )
+     )
+ 
+model_cox <- coxph(f, data = NHData.train)
+
+summary(model_cox)
+```
+
+
+
